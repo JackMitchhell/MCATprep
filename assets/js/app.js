@@ -109,6 +109,8 @@
         ${statCard(fc.dueNow, "Cards due", "good")}
       </div>
 
+      ${weeklyReviewCard()}
+
       <div class="grid cols-2 mt">
         <div class="card">
           <div class="card-head"><h3>${summary.phase ? summary.phase.icon + " " + esc(summary.phase.name) : "Plan"}</h3>
@@ -166,6 +168,106 @@
         ${dashJournalCard()}
       </div>
     `;
+  }
+
+  // ---------- Weekly review ----------
+  // Calendar week (Sunday–Saturday) containing today, shifted by `offset` weeks.
+  function weekBounds(offset) {
+    const day = new Date().getDay(); // 0=Sun
+    return {
+      start: Store.isoOffset(new Date(), -day + offset * 7),
+      end: Store.isoOffset(new Date(), -day + offset * 7 + 6)
+    };
+  }
+  function aggregateRange(start, end) {
+    const S = Store.get();
+    let hours = 0, studyDays = 0, targets = 0, entries = 0;
+    const confSum = { cp: [], cars: [], bb: [], ps: [] };
+    Object.entries(S.dayLog).forEach(([iso, d]) => {
+      if (iso < start || iso > end) return;
+      targets += Object.values(d.tasks || {}).filter(Boolean).length;
+      if (d.studied) studyDays++;
+    });
+    S.journal.forEach((e) => {
+      if (e.date < start || e.date > end) return;
+      entries++; hours += (Number(e.minutes) || 0) / 60;
+      ["cp", "cars", "bb", "ps"].forEach((k) => { const v = (e.confidence || {})[k]; if (v > 0) confSum[k].push(v); });
+    });
+    const carsSec = [];
+    S.carsSessions.forEach((s) => { if (s.date < start || s.date > end) return; s.passages.forEach((p) => carsSec.push(p.seconds)); });
+    const carsAvgPace = carsSec.length ? Math.round(carsSec.reduce((a, b) => a + b, 0) / carsSec.length) : null;
+    let cardsReviewed = 0;
+    Object.values(S.srs).forEach((m) => { if (m.lastReviewed && m.lastReviewed >= start && m.lastReviewed <= end) cardsReviewed++; });
+    const conf = {}; const cvals = [];
+    ["cp", "cars", "bb", "ps"].forEach((k) => {
+      if (confSum[k].length) { conf[k] = confSum[k].reduce((a, b) => a + b, 0) / confSum[k].length; cvals.push(conf[k]); }
+      else conf[k] = null;
+    });
+    conf.overall = cvals.length ? cvals.reduce((a, b) => a + b, 0) / cvals.length : null;
+    let examBest = null;
+    S.examScores.forEach((x) => { if (x.date < start || x.date > end) return; if (x.total && (examBest == null || x.total > examBest)) examBest = x.total; });
+    return { hours, studyDays, targets, carsAvgPace, carsPassages: carsSec.length, cardsReviewed, conf, entries, examBest };
+  }
+  function deltaTag(cur, prev, opts) {
+    opts = opts || {};
+    if (cur == null && prev == null) return `<span class="small faint">—</span>`;
+    const c = cur || 0, p = prev || 0, diff = c - p;
+    if (prev == null) return `<span class="small faint">new this week</span>`;
+    if (Math.abs(diff) < (opts.eps || 0.05)) return `<span class="small faint">— vs last wk</span>`;
+    const better = opts.invert ? diff < 0 : diff > 0;
+    const arrow = diff > 0 ? "▲" : "▼";
+    const val = opts.isTime ? fmtClock(Math.abs(diff)) : (opts.dp ? Math.abs(diff).toFixed(opts.dp) : Math.round(Math.abs(diff)));
+    return `<span class="small" style="color:${better ? "var(--good)" : "var(--bad)"}">${arrow} ${val}${opts.suffix || ""} vs last wk</span>`;
+  }
+  function weeklyTakeaway(a, b) {
+    if (a.hours === 0 && a.studyDays === 0 && a.carsPassages === 0 && a.entries === 0)
+      return "No activity logged this week yet — complete some targets, run a CARS session, and add a journal entry to build your review.";
+    const parts = [`You studied <b>${a.hours.toFixed(1)}h</b> across <b>${a.studyDays}</b> day${a.studyDays === 1 ? "" : "s"} and cleared <b>${a.targets}</b> target${a.targets === 1 ? "" : "s"}`];
+    const dh = a.hours - b.hours;
+    if (b.hours > 0) parts.push(dh >= 0.05 ? ` — up ${dh.toFixed(1)}h on last week` : (dh <= -0.05 ? ` — down ${Math.abs(dh).toFixed(1)}h vs last week` : " — level with last week"));
+    parts.push(".");
+    if (a.carsAvgPace != null) {
+      parts.push(` CARS pace <b>${fmtClock(a.carsAvgPace)}</b>/passage`);
+      if (b.carsAvgPace != null) {
+        const dp = a.carsAvgPace - b.carsAvgPace;
+        parts.push(dp < 0 ? ` (${fmtClock(-dp)} faster 🎯)` : (dp > 0 ? ` (${fmtClock(dp)} slower)` : " (steady)"));
+      }
+      parts.push(".");
+    }
+    let up = 0, down = 0;
+    ["cp", "cars", "bb", "ps"].forEach((k) => { if (a.conf[k] != null && b.conf[k] != null) { if (a.conf[k] > b.conf[k]) up++; else if (a.conf[k] < b.conf[k]) down++; } });
+    if (up || down) parts.push(` Confidence rose in <b>${up}</b> section${up === 1 ? "" : "s"}${down ? `, dipped in ${down}` : ""}.`);
+    else if (a.conf.overall != null) parts.push(` Overall confidence <b>${a.conf.overall.toFixed(1)}/5</b>.`);
+    return parts.join("");
+  }
+  function weeklyReviewCard() {
+    const cur = weekBounds(0), prev = weekBounds(-1);
+    const a = aggregateRange(cur.start, cur.end), b = aggregateRange(prev.start, prev.end);
+    const metric = (lbl, valHtml, delta, cls) => `<div class="stat" style="text-align:left">
+      <div class="lbl">${lbl}</div>
+      <div class="num ${cls || ""}" style="font-size:1.7rem">${valHtml}</div>
+      <div>${delta}</div></div>`;
+    const confChange = Curriculum.SECTIONS.map((s) => {
+      const c = a.conf[s.id], p = b.conf[s.id];
+      const dots = c != null ? confDots(Math.round(c)) : `<span class="small faint">—</span>`;
+      let arrow = "";
+      if (c != null && p != null) { const d = c - p; arrow = d > 0.05 ? `<span style="color:var(--good)">▲</span>` : (d < -0.05 ? `<span style="color:var(--bad)">▼</span>` : `<span class="faint">■</span>`); }
+      return `<div class="row" style="gap:8px;align-items:center">${sectionBadge(s.id)} ${dots} ${arrow}</div>`;
+    }).join("");
+    return `<div class="card pad-lg mt-lg">
+      <div class="card-head"><h2>📅 This week in review</h2>
+        <span class="small muted">${Planner.fmtDate(cur.start)} – ${Planner.fmtDate(cur.end)}</span></div>
+      <div class="grid cols-4">
+        ${metric("Hours studied", a.hours.toFixed(1) + "h", deltaTag(a.hours, b.entries ? b.hours : null, { dp: 1, suffix: "h" }), "primary")}
+        ${metric("Avg CARS pace", a.carsAvgPace != null ? fmtClock(a.carsAvgPace) : "—", a.carsAvgPace != null ? deltaTag(a.carsAvgPace, b.carsAvgPace, { isTime: true, invert: true }) : `<span class="small faint">no sessions</span>`, "accent")}
+        ${metric("Cards reviewed", a.cardsReviewed, deltaTag(a.cardsReviewed, b.cardsReviewed, {}), "good")}
+        ${metric("Confidence", a.conf.overall != null ? a.conf.overall.toFixed(1) + "/5" : "—", a.conf.overall != null ? deltaTag(a.conf.overall, b.conf.overall, { dp: 1 }) : `<span class="small faint">log a journal</span>`, "warn")}
+      </div>
+      <div class="divider"></div>
+      <div class="row" style="gap:20px;flex-wrap:wrap">${confChange}</div>
+      <p class="small mt" style="margin-bottom:0;color:var(--text)">${weeklyTakeaway(a, b)}</p>
+      ${a.examBest ? `<div class="small muted mt">🧪 Best practice exam this week: <b>${a.examBest}</b></div>` : ""}
+    </div>`;
   }
 
   function dashCarsCard() {
