@@ -43,7 +43,9 @@
             { id: "cp-acidbase", name: "Acids, bases & buffers", hours: 3, res: [
               { t: "pH, pKa & buffers", u: yt("MCAT acids bases buffers henderson hasselbalch") } ] },
             { id: "cp-electro", name: "Electrochemistry", hours: 2, res: [
-              { t: "Galvanic & electrolytic cells", u: yt("MCAT electrochemistry galvanic cells nernst") } ] }
+              { t: "Galvanic & electrolytic cells", u: yt("MCAT electrochemistry galvanic cells nernst") } ] },
+            { id: "cp-gases", name: "Gas phase & kinetic molecular theory", hours: 2, res: [
+              { t: "Ideal & real gases", u: yt("MCAT gases ideal gas law kinetic molecular theory partial pressure") } ] }
           ]
         },
         {
@@ -60,7 +62,10 @@
             { id: "cp-waves", name: "Waves, sound & optics", hours: 3, res: [
               { t: "Waves, sound & light", u: yt("MCAT waves sound optics lenses") } ] },
             { id: "cp-thermophys", name: "Thermodynamics (physics) & heat", hours: 2, res: [
-              { t: "Heat transfer & gas laws", u: yt("MCAT thermodynamics physics heat ideal gas") } ] }
+              { t: "Heat transfer & gas laws", u: yt("MCAT thermodynamics physics heat ideal gas") } ] },
+            { id: "cp-atomicphys", name: "Atomic & nuclear phenomena (light, quantum, decay)", hours: 2, res: [
+              { t: "Light, photoelectric effect & quanta", u: yt("MCAT light photoelectric effect quantum atomic spectra") },
+              { t: "Nuclear chemistry & radioactive decay", u: yt("MCAT nuclear chemistry radioactive decay half life") } ] }
           ]
         },
         {
@@ -128,7 +133,12 @@
             { id: "bb-lipids", name: "Lipids & lipid metabolism", hours: 2, res: [
               { t: "Lipid metabolism", u: yt("MCAT lipids fatty acid metabolism") } ] },
             { id: "bb-nucleic", name: "Nucleic acids & molecular genetics", hours: 3, res: [
-              { t: "DNA/RNA & central dogma", u: yt("MCAT nucleic acids DNA replication transcription translation") } ] }
+              { t: "DNA/RNA & central dogma", u: yt("MCAT nucleic acids DNA replication transcription translation") } ] },
+            { id: "bb-carbs", name: "Carbohydrates & alternative metabolism (glycogen, gluconeogenesis, PPP)", hours: 3, res: [
+              { t: "Carbohydrate structure", u: yt("MCAT carbohydrates structure monosaccharides glycosidic") },
+              { t: "Glycogen, gluconeogenesis & PPP", u: yt("MCAT glycogenesis gluconeogenesis pentose phosphate pathway") } ] },
+            { id: "bb-biosignaling", name: "Cell signaling & second messengers", hours: 2, res: [
+              { t: "Receptors & signal cascades", u: yt("MCAT cell signaling G protein second messenger cAMP receptors") } ] }
           ]
         },
         {
@@ -136,8 +146,16 @@
           topics: [
             { id: "bb-cell", name: "Cell structure & organelles", hours: 2, res: [
               { t: "Cell biology", u: yt("MCAT cell structure organelles membrane transport") } ] },
+            { id: "bb-membrane", name: "Membrane structure & transport", hours: 2, res: [
+              { t: "Membranes & transport", u: yt("MCAT cell membrane structure passive active transport osmosis") } ] },
+            { id: "bb-cellcycle", name: "Cell cycle, mitosis & meiosis", hours: 2, res: [
+              { t: "Cell cycle & division", u: yt("MCAT cell cycle mitosis meiosis checkpoints cancer") } ] },
             { id: "bb-genetics", name: "Genetics & inheritance", hours: 3, res: [
               { t: "Mendelian & molecular genetics", u: yt("MCAT genetics inheritance punnett mutations") } ] },
+            { id: "bb-evolution", name: "Evolution & population genetics (Hardy–Weinberg)", hours: 2, res: [
+              { t: "Natural selection & Hardy–Weinberg", u: yt("MCAT evolution natural selection hardy weinberg population genetics") } ] },
+            { id: "bb-biotech", name: "Molecular biology techniques (PCR, cloning, blotting)", hours: 2, res: [
+              { t: "Biotech lab methods", u: yt("MCAT molecular biology techniques PCR gel electrophoresis cloning blotting") } ] },
             { id: "bb-micro", name: "Microbiology & viruses", hours: 2, res: [
               { t: "Bacteria & viruses", u: yt("MCAT microbiology bacteria viruses") } ] }
           ]
@@ -183,7 +201,16 @@
             { id: "ps-development", name: "Development & personality", hours: 3, res: [
               { t: "Developmental & personality theories", u: yt("MCAT development personality freud erikson piaget") } ] },
             { id: "ps-disorders", name: "Psychological disorders", hours: 2, res: [
-              { t: "Psych disorders & treatment", u: yt("MCAT psychological disorders DSM treatment") } ] }
+              { t: "Psych disorders & treatment", u: yt("MCAT psychological disorders DSM treatment") } ] },
+            { id: "ps-biological", name: "Biological bases of behavior (brain & neurotransmitters)", hours: 3, res: [
+              { t: "Brain regions & their functions", u: yt("MCAT biological basis of behavior brain regions") },
+              { t: "Neurotransmitters in behavior", u: yt("MCAT neurotransmitters functions behavior dopamine serotonin") } ] },
+            { id: "ps-consciousness", name: "Consciousness, sleep & drug states", hours: 2, res: [
+              { t: "States of consciousness", u: yt("MCAT consciousness sleep stages dreaming psychoactive drugs") } ] },
+            { id: "ps-identity", name: "Identity & the self", hours: 2, res: [
+              { t: "Self-concept & identity formation", u: yt("MCAT self identity self concept self esteem formation") } ] },
+            { id: "ps-attitudes", name: "Attitudes & behavior change (persuasion, dissonance)", hours: 2, res: [
+              { t: "Attitudes & persuasion", u: yt("MCAT attitudes behavior change cognitive dissonance persuasion elaboration likelihood") } ] }
           ]
         },
         {
@@ -198,7 +225,11 @@
             { id: "ps-demographics", name: "Demographics & social change", hours: 2, res: [
               { t: "Demographics & urbanization", u: yt("MCAT demographics social change urbanization") } ] },
             { id: "ps-inequality", name: "Social inequality & stratification", hours: 2, res: [
-              { t: "Inequality & health disparities", u: yt("MCAT social inequality stratification health disparities") } ] }
+              { t: "Inequality & health disparities", u: yt("MCAT social inequality stratification health disparities") } ] },
+            { id: "ps-culture", name: "Culture & socialization", hours: 2, res: [
+              { t: "Culture, norms & socialization", u: yt("MCAT culture socialization norms values material symbolic") } ] },
+            { id: "ps-health", name: "Medical sociology & healthcare disparities", hours: 2, res: [
+              { t: "Medicine as a social institution", u: yt("MCAT medical sociology sick role healthcare access disparities") } ] }
           ]
         }
       ]
