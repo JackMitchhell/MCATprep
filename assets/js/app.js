@@ -5,10 +5,10 @@
   const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) =>
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
-  const ROUTES = ["dashboard", "today", "plan", "flashcards", "resources", "application", "settings"];
+  const ROUTES = ["dashboard", "today", "plan", "flashcards", "cars", "journal", "resources", "application", "settings"];
   const TITLES = {
     dashboard: "Dashboard", today: "Today", plan: "Study Plan", flashcards: "Flashcards",
-    resources: "Resources", application: "Application", settings: "Settings"
+    cars: "CARS Timer", journal: "Journal", resources: "Resources", application: "Application", settings: "Settings"
   };
 
   // ---------- coverage helpers ----------
@@ -247,6 +247,7 @@
           ${t.meta ? `<div class="task-meta">${esc(t.meta)}</div>` : ""}
           ${links ? `<div class="task-links">${links}</div>` : ""}
           ${t.type === "flash" ? `<div class="task-links"><a href="#/flashcards">Open flashcards →</a></div>` : ""}
+          ${t.type === "cars" ? `<div class="task-links"><a href="#/cars">⏱️ Open CARS timer →</a></div>` : ""}
         </div>
       </div>`;
     }).join("");
@@ -309,7 +310,7 @@
   }
 
   // ---------- Flashcards ----------
-  let fcQueue = null, fcIndex = 0, fcRevealed = false;
+  let fcQueue = null, fcIndex = 0, fcRevealed = false, lastAnkiMsg = "";
   function viewFlashcards() {
     const stats = SRS.stats();
     return `
@@ -342,6 +343,26 @@
           <div class="card-head"><h3>🗂️ Your custom cards</h3><span class="small muted">${Store.get().customCards.length}</span></div>
           ${customCardsList()}
         </div>
+      </div>
+
+      <div class="card mt-lg">
+        <div class="card-head"><h3>📥 Import / export (Anki-compatible)</h3></div>
+        <p class="small">Paste or upload an Anki text export. In Anki: <i>File → Export → Notes in Plain Text (.txt)</i>. Each line should be <code>front&nbsp;⇥&nbsp;back</code> (tab) or comma-separated. HTML is stripped automatically.</p>
+        <form data-form="anki-import">
+          <div class="row" style="gap:8px">
+            <select name="section" style="flex:1">
+              <option value="">Tag: no section</option>
+              ${Curriculum.SECTIONS.map((s) => `<option value="${s.id}">Tag as ${esc(s.short)}</option>`).join("")}
+            </select>
+            <label class="btn" style="cursor:pointer">📄 Choose .txt/.csv<input type="file" accept=".txt,.csv,text/plain" data-import-anki hidden></label>
+          </div>
+          <textarea name="text" class="mt" placeholder="What is the powerhouse of the cell?	Mitochondria&#10;Henderson-Hasselbalch?	pH = pKa + log([A-]/[HA])"></textarea>
+          <div class="btn-grp mt">
+            <button class="btn primary" type="submit">Import cards</button>
+            <button class="btn" type="button" data-action="export-anki">⬇️ Export all cards (.txt for Anki)</button>
+          </div>
+        </form>
+        <div class="small muted mt" id="ankiResult">${esc(lastAnkiMsg)}</div>
       </div>`;
   }
 
@@ -537,6 +558,206 @@
       <a class="btn primary" href="#/settings">Go to settings →</a></div>`;
   }
 
+  // ---------- CARS Timer ----------
+  let carsState = { targetMin: 10, accumulated: 0, startedAt: null, running: false, splits: [] };
+  let carsInterval = null;
+
+  function carsElapsed() {
+    return carsState.accumulated + (carsState.running && carsState.startedAt ? (Date.now() - carsState.startedAt) / 1000 : 0);
+  }
+  function fmtClock(sec) {
+    const neg = sec < 0; sec = Math.abs(Math.floor(sec));
+    const m = Math.floor(sec / 60), s = sec % 60;
+    return (neg ? "-" : "") + m + ":" + String(s).padStart(2, "0");
+  }
+  function ensureCarsInterval() { if (!carsInterval) carsInterval = setInterval(updateCarsFace, 200); }
+  function carsStart() { if (carsState.running) return; carsState.running = true; carsState.startedAt = Date.now(); ensureCarsInterval(); updateCarsFace(); }
+  function carsPause() {
+    if (!carsState.running) { if (carsInterval) { clearInterval(carsInterval); carsInterval = null; } return; }
+    carsState.accumulated = carsElapsed(); carsState.running = false; carsState.startedAt = null;
+    if (carsInterval) { clearInterval(carsInterval); carsInterval = null; }
+    updateCarsFace();
+  }
+  function carsReset() { carsState.accumulated = 0; carsState.startedAt = carsState.running ? Date.now() : null; updateCarsFace(); }
+  function carsLogPassage() {
+    const sec = Math.round(carsElapsed());
+    if (sec < 1) return;
+    const c = $('[data-cars-correct]'), t = $('[data-cars-total]');
+    carsState.splits.push({ seconds: sec, correct: c && c.value !== "" ? Number(c.value) : null, total: t && t.value !== "" ? Number(t.value) : null });
+    carsState.accumulated = 0; carsState.startedAt = carsState.running ? Date.now() : null;
+    render();
+  }
+  function carsSaveSession() {
+    if (!carsState.splits.length) return;
+    const total = carsState.splits.reduce((a, s) => a + s.seconds, 0);
+    Store.update((s) => { s.carsSessions.push({ date: Store.todayISO(), totalSeconds: total, passages: carsState.splits.slice() }); });
+    // mark today's CARS target complete
+    const d = Store.day(Store.todayISO()); d.tasks["cars"] = true; d.studied = true; Store.save();
+    carsState.splits = []; carsState.accumulated = 0; carsState.startedAt = carsState.running ? Date.now() : null;
+    render();
+  }
+
+  function updateCarsFace() {
+    const timeEl = document.getElementById("carsTime");
+    if (!timeEl) { if (carsInterval) { clearInterval(carsInterval); carsInterval = null; } return; }
+    const el = carsElapsed(), target = carsState.targetMin * 60, rem = target - el;
+    timeEl.textContent = fmtClock(rem);
+    timeEl.className = "timer-display " + (rem < 0 ? "over" : (carsState.running ? "run" : ""));
+    const sub = document.getElementById("carsSub");
+    if (sub) sub.textContent = (rem < 0 ? "Over target by " + fmtClock(-rem) : "Target " + carsState.targetMin + " min/passage") + " · " + (carsState.running ? "running" : "paused");
+    const fg = document.getElementById("carsRingFg");
+    if (fg) {
+      const r = 100, c = 2 * Math.PI * r, p = Math.min(1, Math.max(0, el / target));
+      fg.setAttribute("stroke-dashoffset", c * (1 - p));
+      fg.setAttribute("stroke", rem < 0 ? "var(--bad)" : "var(--accent)");
+    }
+    const sp = document.getElementById("carsStartPause");
+    if (sp) sp.innerHTML = carsState.running ? "⏸ Pause" : "▶ Start";
+  }
+
+  function viewCars() {
+    const r = 100, c = 2 * Math.PI * r;
+    const sessions = Store.get().carsSessions;
+    const splits = carsState.splits;
+
+    const splitList = splits.length ? splits.map((s, i) => {
+      const over = s.seconds > carsState.targetMin * 60;
+      const score = (s.correct != null && s.total != null) ? ` · ${s.correct}/${s.total}` : "";
+      return `<div class="split-row ${over ? "over" : "good"}">
+        <span class="idx">${i + 1}</span>
+        <span class="t">${fmtClock(s.seconds)}</span>
+        <span class="small muted">passage time${score}</span></div>`;
+    }).join("") : `<p class="small muted">No passages logged yet this session. Hit <b>Log passage</b> when you finish each one.</p>`;
+
+    const sessAvg = splits.length ? Math.round(splits.reduce((a, s) => a + s.seconds, 0) / splits.length) : 0;
+
+    const history = sessions.slice(-8).reverse().map((s) => {
+      const avg = s.passages.length ? Math.round(s.totalSeconds / s.passages.length) : 0;
+      const scored = s.passages.filter((p) => p.correct != null);
+      const acc = scored.length ? Math.round(scored.reduce((a, p) => a + p.correct, 0) / scored.reduce((a, p) => a + p.total, 0) * 100) : null;
+      return `<tr><td>${Planner.fmtDate(s.date)}</td><td>${s.passages.length}</td><td>${fmtClock(s.totalSeconds)}</td><td>${fmtClock(avg)}/psg</td><td>${acc != null ? acc + "%" : "—"}</td></tr>`;
+    }).join("");
+
+    return `
+      <div class="banner info"><strong>CARS pacing.</strong> The real CARS section is 9 passages in 90 minutes — about <b>10 minutes each</b>. Train to a consistent per-passage pace, then review every miss.</div>
+      <div class="grid cols-2">
+        <div class="card center">
+          <div class="timer-ring">
+            <svg width="220" height="220">
+              <circle cx="110" cy="110" r="${r}" fill="none" stroke="var(--surface-2)" stroke-width="12"/>
+              <circle id="carsRingFg" cx="110" cy="110" r="${r}" fill="none" stroke="var(--accent)" stroke-width="12"
+                stroke-linecap="round" stroke-dasharray="${c}" stroke-dashoffset="${c}"/>
+            </svg>
+            <div class="inner">
+              <div id="carsTime" class="timer-display" style="font-size:2.6rem">${fmtClock(carsState.targetMin * 60)}</div>
+            </div>
+          </div>
+          <div id="carsSub" class="timer-sub">Target ${carsState.targetMin} min/passage · paused</div>
+          <div class="timer-controls">
+            <button class="btn primary" id="carsStartPause" data-cars="toggle">▶ Start</button>
+            <button class="btn" data-cars="log">✓ Log passage</button>
+            <button class="btn ghost" data-cars="reset">↺ Reset</button>
+          </div>
+          <div class="row mt" style="gap:8px;justify-content:center">
+            <span class="small muted">Score (optional):</span>
+            <input type="number" data-cars-correct placeholder="correct" min="0" style="width:90px">
+            <span class="small muted">/</span>
+            <input type="number" data-cars-total placeholder="total" min="0" style="width:80px">
+          </div>
+          <div class="row mt" style="gap:8px;justify-content:center">
+            <span class="small muted">Minutes per passage:</span>
+            <input type="number" data-cars-target value="${carsState.targetMin}" min="1" max="30" step="0.5" style="width:80px">
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><h3>This session</h3>
+            ${splits.length ? `<span class="small muted">avg ${fmtClock(sessAvg)}/passage</span>` : ""}</div>
+          ${splitList}
+          ${splits.length ? `<button class="btn good mt" data-cars="save">💾 Save session to history</button>` : ""}
+        </div>
+      </div>
+
+      <div class="section-title"><h2>📈 Session history</h2></div>
+      <div class="card">
+        ${sessions.length ? `<table class="simple"><thead><tr><th>Date</th><th>Passages</th><th>Total</th><th>Avg</th><th>Accuracy</th></tr></thead><tbody>${history}</tbody></table>`
+          : `<p class="small muted">No saved sessions yet. Save a session above to start tracking your CARS pacing over time.</p>`}
+      </div>`;
+  }
+
+  // ---------- Journal ----------
+  let journalDraft = null;
+  function freshJournalDraft() { return { id: null, date: Store.todayISO(), minutes: "", mood: "", confidence: { cp: 0, cars: 0, bb: 0, ps: 0 }, text: "" }; }
+  const MOODS = [["😫", 1], ["😕", 2], ["😐", 3], ["🙂", 4], ["🤩", 5]];
+
+  function syncJournalDraft() {
+    if (!journalDraft) return;
+    const d = $('[data-jfield="date"]'); if (d) journalDraft.date = d.value;
+    const m = $('[data-jfield="minutes"]'); if (m) journalDraft.minutes = m.value;
+    const t = $('[data-jfield="text"]'); if (t) journalDraft.text = t.value;
+  }
+
+  function confStars(sec, val) {
+    let out = "";
+    for (let i = 1; i <= 5; i++) out += `<span class="${i <= val ? "on" : ""}" data-conf="${sec}:${i}">★</span>`;
+    return `<div class="stars">${out}</div>`;
+  }
+  function confDots(val) {
+    let out = "";
+    for (let i = 1; i <= 5; i++) out += `<i class="${i <= val ? "on" : ""}"></i>`;
+    return `<span class="conf-dots">${out}</span>`;
+  }
+
+  function viewJournal() {
+    if (!journalDraft) journalDraft = freshJournalDraft();
+    const dr = journalDraft;
+    const entries = Store.get().journal.slice().sort((a, b) => b.date.localeCompare(a.date));
+    const totalMin = Store.get().journal.reduce((a, e) => a + (Number(e.minutes) || 0), 0);
+
+    const form = `<div class="card pad-lg">
+      <div class="card-head"><h2>${dr.id ? "✏️ Edit entry" : "📝 New journal entry"}</h2>
+        ${dr.id ? `<button class="btn sm ghost" data-jcancel>Cancel edit</button>` : ""}</div>
+      <form data-form="journal">
+        <div class="grid cols-2">
+          <label class="field"><span>Date</span><input type="date" data-jfield="date" value="${esc(dr.date)}"></label>
+          <label class="field"><span>Minutes studied</span><input type="number" data-jfield="minutes" min="0" value="${esc(dr.minutes)}" placeholder="e.g. 180"></label>
+        </div>
+        <label class="field"><span>How did today feel?</span>
+          <div class="mood-pick">${MOODS.map(([e, v]) => `<button type="button" class="${dr.mood === e ? "sel" : ""}" data-mood="${v}">${e}</button>`).join("")}</div>
+        </label>
+        <label class="field"><span>Confidence by section (optional)</span>
+          <div class="conf-grid">
+            ${Curriculum.SECTIONS.map((s) => `<div class="conf-set">${sectionBadge(s.id)} ${confStars(s.id, dr.confidence[s.id] || 0)}</div>`).join("")}
+          </div>
+        </label>
+        <label class="field"><span>Reflection — wins, struggles, what to focus on next</span>
+          <textarea data-jfield="text" placeholder="What went well? Where did I struggle? What's my #1 priority tomorrow?">${esc(dr.text)}</textarea></label>
+        <button class="btn primary" type="submit">${dr.id ? "💾 Update entry" : "＋ Add entry"}</button>
+      </form>
+    </div>`;
+
+    const stats = `<div class="grid cols-3 mt-lg">
+      ${statCard(Store.get().journal.length, "Entries", "primary")}
+      ${statCard((totalMin / 60).toFixed(1) + "h", "Total logged", "accent")}
+      ${statCard(entries[0] ? entries[0].mood || "—" : "—", "Latest mood", "good")}
+    </div>`;
+
+    const list = entries.length ? entries.map((e) => `
+      <div class="journal-entry">
+        <div class="je-head">
+          <div><span class="je-date">${Planner.fmtDate(e.date)}</span>
+            ${e.mood ? `<span style="margin-left:8px;font-size:1.2rem">${e.mood}</span>` : ""}
+            ${e.minutes ? `<span class="badge" style="margin-left:8px">⏱ ${(e.minutes / 60).toFixed(1)}h</span>` : ""}</div>
+          <div class="btn-grp"><button class="btn sm" data-jedit="${esc(e.id)}">Edit</button>
+            <button class="btn sm bad" data-jdelete="${esc(e.id)}">✕</button></div>
+        </div>
+        ${e.confidence ? `<div class="row" style="gap:14px;margin-bottom:8px">${Curriculum.SECTIONS.map((s) => (e.confidence[s.id] ? `<span class="conf-row small muted">${s.short} ${confDots(e.confidence[s.id])}</span>` : "")).join("")}</div>` : ""}
+        ${e.text ? `<div class="je-text">${esc(e.text)}</div>` : ""}
+      </div>`).join("") : `<div class="empty"><div class="big">📓</div><p>No entries yet. Reflecting daily — even two lines — compounds like spaced repetition for your mindset.</p></div>`;
+
+    return form + stats + `<div class="section-title"><h2>History</h2></div>` + list;
+  }
+
   // =======================================================================
   // EVENT HANDLING (delegated)
   // =======================================================================
@@ -613,6 +834,46 @@
         return render();
       }
 
+      const cars = e.target.closest("[data-cars]");
+      if (cars) {
+        const a = cars.getAttribute("data-cars");
+        if (a === "toggle") { carsState.running ? carsPause() : carsStart(); }
+        else if (a === "reset") carsReset();
+        else if (a === "log") carsLogPassage();
+        else if (a === "save") carsSaveSession();
+        return;
+      }
+
+      const mood = e.target.closest("[data-mood]");
+      if (mood) {
+        syncJournalDraft();
+        const v = Number(mood.getAttribute("data-mood"));
+        const emoji = (MOODS.find((m) => m[1] === v) || [""])[0];
+        journalDraft.mood = journalDraft.mood === emoji ? "" : emoji;
+        return render();
+      }
+      const conf = e.target.closest("[data-conf]");
+      if (conf) {
+        syncJournalDraft();
+        const [sec, val] = conf.getAttribute("data-conf").split(":");
+        journalDraft.confidence[sec] = journalDraft.confidence[sec] === Number(val) ? 0 : Number(val);
+        return render();
+      }
+      const jedit = e.target.closest("[data-jedit]");
+      if (jedit) {
+        const ent = Store.get().journal.find((x) => x.id === jedit.getAttribute("data-jedit"));
+        if (ent) journalDraft = JSON.parse(JSON.stringify(Object.assign({ confidence: {} }, ent)));
+        return render();
+      }
+      const jdel = e.target.closest("[data-jdelete]");
+      if (jdel) {
+        const id = jdel.getAttribute("data-jdelete");
+        Store.update((s) => { s.journal = s.journal.filter((x) => x.id !== id); });
+        if (journalDraft && journalDraft.id === id) journalDraft = freshJournalDraft();
+        return render();
+      }
+      if (e.target.closest("[data-jcancel]")) { journalDraft = freshJournalDraft(); return render(); }
+
       const action = e.target.closest("[data-action]");
       if (action) return handleAction(action.getAttribute("data-action"));
 
@@ -630,6 +891,17 @@
       if (exp) {
         Store.update((s) => { s.experiences[exp.getAttribute("data-exp")] = Number(exp.value) || 0; });
         return render();
+      }
+      const ct = e.target.closest("[data-cars-target]");
+      if (ct) { carsState.targetMin = Math.max(0.5, Number(ct.value) || 10); updateCarsFace(); return; }
+
+      const impAnki = e.target.closest("[data-import-anki]");
+      if (impAnki && impAnki.files[0]) {
+        const sec = (impAnki.closest("form") || document).querySelector('[name="section"]');
+        const reader = new FileReader();
+        reader.onload = () => importAnki(reader.result, sec ? sec.value : "");
+        reader.readAsText(impAnki.files[0]);
+        return;
       }
       const imp = e.target.closest("[data-import]");
       if (imp && imp.files[0]) {
@@ -676,6 +948,23 @@
           (s.userResources[sec] = s.userResources[sec] || []).push({ title: data.title, url: data.url, channel: "" });
         });
         render();
+      } else if (kind === "anki-import") {
+        importAnki(data.text || "", data.section || "");
+      } else if (kind === "journal") {
+        syncJournalDraft();
+        const dr = journalDraft;
+        if (!dr.text.trim() && !dr.minutes && !dr.mood) { alert("Add a reflection, minutes, or mood first."); return; }
+        Store.update((s) => {
+          if (dr.id) {
+            const idx = s.journal.findIndex((x) => x.id === dr.id);
+            if (idx > -1) s.journal[idx] = Object.assign({}, dr);
+          } else {
+            const entry = Object.assign({}, dr, { id: "j-" + Date.now() + "-" + Math.random().toString(36).slice(2, 5) });
+            s.journal.push(entry);
+          }
+        });
+        journalDraft = freshJournalDraft();
+        render();
       }
     });
   }
@@ -687,12 +976,65 @@
     if (stage) stage.innerHTML = renderFcStage();
   }
 
+  // Strip HTML and decode common entities from Anki note fields.
+  function stripHtml(s) {
+    return String(s)
+      .replace(/<\s*br\s*\/?\s*>/gi, "\n")
+      .replace(/<[^>]+>/g, "")
+      .replace(/&nbsp;/gi, " ").replace(/&amp;/gi, "&").replace(/&lt;/gi, "<")
+      .replace(/&gt;/gi, ">").replace(/&quot;/gi, '"').replace(/&#39;/gi, "'")
+      .trim();
+  }
+  // Parse a single CSV line respecting quoted fields.
+  function csvSplit(line) {
+    const out = []; let cur = "", q = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (q) {
+        if (ch === '"' && line[i + 1] === '"') { cur += '"'; i++; }
+        else if (ch === '"') q = false;
+        else cur += ch;
+      } else if (ch === '"') q = true;
+      else if (ch === ",") { out.push(cur); cur = ""; }
+      else cur += ch;
+    }
+    out.push(cur);
+    return out;
+  }
+  function importAnki(text, section) {
+    const lines = String(text).split(/\r?\n/);
+    let added = 0;
+    Store.update((s) => {
+      lines.forEach((line) => {
+        if (!line.trim() || line.charAt(0) === "#") return; // skip blanks + Anki header comments
+        let parts;
+        if (line.indexOf("\t") > -1) parts = line.split("\t");
+        else if (line.indexOf(",") > -1) parts = csvSplit(line);
+        else return;
+        const front = stripHtml(parts[0] || ""), back = stripHtml(parts.slice(1).join(" ") || "");
+        if (!front || !back) return;
+        s.customCards.push({ id: "u-" + Date.now() + "-" + Math.random().toString(36).slice(2, 7), front, back, section: section || "", topic: "Imported" });
+        added++;
+      });
+    });
+    fcQueue = null;
+    lastAnkiMsg = added ? `✅ Imported ${added} card${added === 1 ? "" : "s"}.` : "No valid cards found — check the format (front⇥back per line).";
+    render();
+  }
+
   function handleAction(action) {
     if (action === "export") {
       const blob = new Blob([Store.export()], { type: "application/json" });
       const a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
       a.download = "mcat-prep-backup-" + Store.todayISO() + ".json";
+      a.click();
+    } else if (action === "export-anki") {
+      const tsv = SRS.allCards().map((c) => (c.front.replace(/\t/g, " ") + "\t" + c.back.replace(/\t/g, " "))).join("\n");
+      const blob = new Blob(["#separator:tab\n#html:false\n" + tsv], { type: "text/plain" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "mcat-flashcards-anki-" + Store.todayISO() + ".txt";
       a.click();
     } else if (action === "reset") {
       if (confirm("Erase ALL your progress, settings, and flashcard history? This cannot be undone.")) {
@@ -706,7 +1048,8 @@
   // =======================================================================
   const VIEWS = {
     dashboard: viewDashboard, today: viewToday, plan: viewPlan,
-    flashcards: viewFlashcards, resources: viewResources, application: viewApplication, settings: viewSettings
+    flashcards: viewFlashcards, cars: viewCars, journal: viewJournal,
+    resources: viewResources, application: viewApplication, settings: viewSettings
   };
 
   function currentRoute() {
@@ -718,7 +1061,9 @@
     const route = currentRoute();
     if (route === "flashcards") { /* keep queue across renders unless reset */ }
     else { fcQueue = null; fcIndex = 0; fcRevealed = false; }
+    if (route !== "cars") carsPause(); // stop ticking when leaving the timer
     $("#view").innerHTML = VIEWS[route]();
+    if (route === "cars") { updateCarsFace(); if (carsState.running) ensureCarsInterval(); }
     $("#topbarTitle").textContent = TITLES[route];
     $$("#nav a").forEach((a) => a.classList.toggle("active", a.getAttribute("data-route") === route));
     // top-right countdown

@@ -29,6 +29,10 @@
     userResources: {},
     // practice exam scores: [{date, name, total, cp, cars, bb, ps}]
     examScores: [],
+    // CARS timer sessions: [{date, totalSeconds, passages:[{seconds, correct, total}]}]
+    carsSessions: [],
+    // journal entries: [{id, date, minutes, mood, confidence:{cp,cars,bb,ps}, text}]
+    journal: [],
     meta: { createdAt: null, version: 1 }
   };
 
