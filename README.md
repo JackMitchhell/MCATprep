@@ -14,12 +14,12 @@ be hosted for free on GitHub Pages.
 
 | Area | What it does |
 |------|--------------|
-| **📊 Dashboard** | Countdown to test day, current phase, per-section content-coverage rings, study streak, practice-exam score log, and a 16-week activity heatmap. |
+| **📊 Dashboard** | Countdown to test day, current phase, per-section content-coverage rings, study streak, practice-exam score log, a 16-week activity heatmap, plus **CARS pacing** and **study-log/mood trend** cards (with sparklines) pulled from your timer and journal. |
 | **🎯 Today** | Auto-generated daily targets for your current phase — content review, daily CARS, flashcards, practice, and full-lengths — each with one-tap resource links. Check items off as you go. |
 | **🗓️ Study Plan** | A periodized roadmap split into **Foundation → Application → Testing → Final Prep**, generated from your test date. Full content checklist across all four AAMC sections. |
 | **🔁 Flashcards** | Spaced repetition using the **SM-2 algorithm** (the same one Anki is based on). Ships with a high-yield seed deck; add your own cards, or **import/export Anki decks** (plain-text/CSV). |
 | **⏱️ CARS Timer** | A passage-pacing timer tuned to the real exam (9 passages / 90 min ≈ 10 min each). Logs per-passage splits and accuracy, flags over-target passages, and tracks your pacing across sessions. Saving a session auto-completes today's CARS target. |
-| **📓 Journal** | Daily reflections with study minutes, a mood check-in, and per-section confidence ratings (1–5). Edit/delete past entries and watch your confidence and hours build over time. |
+| **📓 Journal** | Daily reflections with study minutes, a mood check-in, and per-section confidence ratings (1–5), plus a **confidence & study-hours trend chart** (sparkline per section). Edit/delete past entries and watch your confidence and hours build over time. |
 | **📚 Resources** | Curated **free** content — Khan Academy, top YouTube channels, Jack Westin CARS, and official AAMC material — mapped to every topic. Save your own links too. |
 | **🏥 Application** | The full AMCAS cycle as a checklist (experiences, LORs, personal statement, secondaries, interviews) plus clinical/shadowing/research hour trackers. |
 | **⚙️ Settings** | Set your test date, study hours, and rest day. Export/import a JSON backup to move between devices. |

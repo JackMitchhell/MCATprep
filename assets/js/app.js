@@ -51,6 +51,26 @@
   function bar(pct, good) {
     return `<div class="bar ${good ? "good" : ""}"><span style="width:${Math.round(pct * 100)}%"></span></div>`;
   }
+  // Tiny inline sparkline from an array of numbers.
+  function sparkline(vals, opts) {
+    opts = opts || {};
+    const w = opts.w || 180, h = opts.h || 42, pad = 4, color = opts.color || "var(--accent)", area = opts.area !== false;
+    if (!vals || !vals.length) return `<div class="small faint">Not enough data yet.</div>`;
+    if (vals.length === 1) vals = [vals[0], vals[0]];
+    const lo = opts.min != null ? opts.min : Math.min(...vals);
+    const hi = opts.max != null ? opts.max : Math.max(...vals);
+    const rng = (hi - lo) || 1;
+    const stepX = (w - pad * 2) / (vals.length - 1);
+    const pts = vals.map((v, i) => [pad + i * stepX, h - pad - ((v - lo) / rng) * (h - pad * 2)]);
+    const line = pts.map((p, i) => (i ? "L" : "M") + p[0].toFixed(1) + " " + p[1].toFixed(1)).join(" ");
+    const last = pts[pts.length - 1];
+    const areaPath = area ? `${line} L ${last[0].toFixed(1)} ${h - pad} L ${pts[0][0].toFixed(1)} ${h - pad} Z` : "";
+    return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" style="max-width:100%">
+      ${area ? `<path d="${areaPath}" fill="${color}" opacity="0.13"/>` : ""}
+      <path d="${line}" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="${last[0].toFixed(1)}" cy="${last[1].toFixed(1)}" r="2.6" fill="${color}"/>
+    </svg>`;
+  }
   const SECTION_COLORVAR = { cp: "var(--sec-cp)", cars: "var(--sec-cars)", bb: "var(--sec-bb)", ps: "var(--sec-ps)" };
   function sectionBadge(id) {
     if (!id) return "";
@@ -140,7 +160,60 @@
           <p class="small muted mt">Each square is a day. Greener = more targets completed.</p>
         </div>
       </div>
+
+      <div class="grid cols-2 mt-lg">
+        ${dashCarsCard()}
+        ${dashJournalCard()}
+      </div>
     `;
+  }
+
+  function dashCarsCard() {
+    const sessions = Store.get().carsSessions;
+    if (!sessions.length) {
+      return `<div class="card"><div class="card-head"><h3>⏱️ CARS pacing</h3></div>
+        <p class="small">Train your per-passage speed with the built-in timer. Saved sessions appear here as a pacing trend.</p>
+        <a class="btn sm primary" href="#/cars">Open CARS timer →</a></div>`;
+    }
+    const avgPace = sessions.map((s) => s.passages.length ? Math.round(s.totalSeconds / s.passages.length) : 0);
+    const latest = avgPace[avgPace.length - 1];
+    const best = Math.min(...avgPace.filter((x) => x > 0));
+    const totalPassages = sessions.reduce((a, s) => a + s.passages.length, 0);
+    const scored = sessions.flatMap((s) => s.passages).filter((p) => p.correct != null);
+    const acc = scored.length ? Math.round(scored.reduce((a, p) => a + p.correct, 0) / scored.reduce((a, p) => a + p.total, 0) * 100) : null;
+    const onPace = latest <= 600;
+    return `<div class="card"><div class="card-head"><h3>⏱️ CARS pacing</h3>
+        <span class="badge ${onPace ? "bb" : "ps"}">${onPace ? "on pace" : "over 10:00"}</span></div>
+      <div class="kpi-inline"><div class="k">Latest avg <b>${fmtClock(latest)}</b>/psg</div>
+        <div class="k">Best <b>${fmtClock(best)}</b></div>
+        <div class="k">Passages <b>${totalPassages}</b></div>
+        ${acc != null ? `<div class="k">Accuracy <b>${acc}%</b></div>` : ""}</div>
+      <div class="mt">${sparkline(avgPace, { color: "var(--sec-cars)" })}</div>
+      <div class="small faint">Avg seconds per passage, by session · target ≤ 10:00</div>
+    </div>`;
+  }
+
+  function dashJournalCard() {
+    const journal = Store.get().journal.slice().sort((a, b) => a.date.localeCompare(b.date));
+    if (!journal.length) {
+      return `<div class="card"><div class="card-head"><h3>📓 Study log & mindset</h3></div>
+        <p class="small">Log study minutes, mood, and section confidence in the Journal. Your trends show up here.</p>
+        <a class="btn sm primary" href="#/journal">Open journal →</a></div>`;
+    }
+    const minutes = journal.map((e) => Number(e.minutes) || 0);
+    const totalH = (minutes.reduce((a, b) => a + b, 0) / 60).toFixed(1);
+    const latest = journal[journal.length - 1];
+    const confNow = Curriculum.SECTIONS.map((s) => `<span class="conf-row small muted">${s.short} ${confDots((latest.confidence || {})[s.id] || 0)}</span>`).join("");
+    return `<div class="card"><div class="card-head"><h3>📓 Study log & mindset</h3>
+        ${latest.mood ? `<span style="font-size:1.3rem">${latest.mood}</span>` : ""}</div>
+      <div class="kpi-inline"><div class="k">Logged <b>${totalH}h</b></div>
+        <div class="k">Entries <b>${journal.length}</b></div></div>
+      <div class="mt">${sparkline(minutes.map((m) => m / 60), { color: "var(--primary)", min: 0 })}</div>
+      <div class="small faint">Hours studied per journal entry</div>
+      <div class="divider"></div>
+      <div class="small muted" style="margin-bottom:6px">Latest confidence</div>
+      <div class="row" style="gap:14px">${confNow}</div>
+    </div>`;
   }
 
   function welcomeCards() {
@@ -755,7 +828,29 @@
         ${e.text ? `<div class="je-text">${esc(e.text)}</div>` : ""}
       </div>`).join("") : `<div class="empty"><div class="big">📓</div><p>No entries yet. Reflecting daily — even two lines — compounds like spaced repetition for your mindset.</p></div>`;
 
-    return form + stats + `<div class="section-title"><h2>History</h2></div>` + list;
+    // Confidence + study-minutes trend chart
+    const asc = entries.slice().reverse();
+    const sectionColor = { cp: "var(--sec-cp)", cars: "var(--sec-cars)", bb: "var(--sec-bb)", ps: "var(--sec-ps)" };
+    const confRows = Curriculum.SECTIONS.map((s) => {
+      const series = asc.map((e) => (e.confidence || {})[s.id]).filter((v) => v > 0);
+      const latestVal = series.length ? series[series.length - 1] : 0;
+      return `<div class="row" style="gap:12px;align-items:center;margin-bottom:6px">
+        <div style="width:54px">${sectionBadge(s.id)}</div>
+        <div style="flex:1;min-width:0">${series.length ? sparkline(series, { min: 1, max: 5, color: sectionColor[s.id], h: 34 }) : `<span class="small faint">No ratings yet</span>`}</div>
+        <div class="small muted" style="width:64px;text-align:right">${latestVal ? confDots(latestVal) : "—"}</div>
+      </div>`;
+    }).join("");
+    const minutesSeries = asc.map((e) => (Number(e.minutes) || 0) / 60);
+    const trend = (entries.length >= 1) ? `<div class="card mt-lg">
+      <div class="card-head"><h3>📈 Confidence & study trend</h3><span class="small muted">over ${entries.length} entr${entries.length === 1 ? "y" : "ies"}</span></div>
+      <div class="small muted" style="margin-bottom:8px">Section confidence (1–5)</div>
+      ${confRows}
+      <div class="divider"></div>
+      <div class="small muted" style="margin-bottom:6px">Hours studied per entry</div>
+      ${minutesSeries.some((m) => m > 0) ? sparkline(minutesSeries, { color: "var(--accent)", min: 0, w: 320 }) : `<span class="small faint">Log study minutes to see this trend.</span>`}
+    </div>` : "";
+
+    return form + stats + trend + `<div class="section-title"><h2>History</h2></div>` + list;
   }
 
   // =======================================================================
