@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Track — Habit & Sleep Tracker</title>
+  <meta name="description" content="Track daily and weekly goals, time spent, completion, and sleep." />
+  <link rel="stylesheet" href="assets/css/style.css" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>✅</text></svg>" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><span class="brand-mark">✅</span> Habit &amp; Sleep Tracker</div>
+    <nav class="nav">
+      <a href="index.html" class="active">Track</a>
+      <a href="insights.html">Insights</a>
+    </nav>
+    <div class="topbar-right">
+      <div class="streak-pill">🔥 <span id="streakCount">0</span> day streak</div>
+    </div>
+  </header>
+
+  <main class="view">
+    <div class="grid cols-2">
+      <!-- Daily goals -->
+      <section class="card">
+        <div class="card-head">
+          <h2>Today's Goals</h2>
+          <div class="date-nav">
+            <button id="dayPrev" aria-label="Previous day">‹</button>
+            <span class="label" id="dayLabel"></span>
+            <button id="dayNext" aria-label="Next day">›</button>
+          </div>
+        </div>
+        <form class="inline-add" id="dailyForm">
+          <div class="field grow">
+            <label>Task</label>
+            <input type="text" id="dailyTitle" placeholder="e.g. Read 30 pages" required />
+          </div>
+          <div class="field" style="max-width:110px">
+            <label>Est. min</label>
+            <input type="number" id="dailyEst" min="0" step="5" placeholder="—" />
+          </div>
+          <button class="btn" type="submit">Add</button>
+        </form>
+        <div class="task-list mt" id="dailyList"></div>
+      </section>
+
+      <!-- Weekly goals -->
+      <section class="card">
+        <div class="card-head">
+          <h2>This Week's Goals</h2>
+          <div class="date-nav">
+            <button id="weekPrev" aria-label="Previous week">‹</button>
+            <span class="label" id="weekLabel"></span>
+            <button id="weekNext" aria-label="Next week">›</button>
+          </div>
+        </div>
+        <form class="inline-add" id="weeklyForm">
+          <div class="field grow">
+            <label>Goal</label>
+            <input type="text" id="weeklyTitle" placeholder="e.g. Run 15 miles" required />
+          </div>
+          <div class="field" style="max-width:110px">
+            <label>Est. min</label>
+            <input type="number" id="weeklyEst" min="0" step="5" placeholder="—" />
+          </div>
+          <button class="btn" type="submit">Add</button>
+        </form>
+        <div class="task-list mt" id="weeklyList"></div>
+      </section>
+    </div>
+
+    <!-- Sleep -->
+    <section class="card mt-lg">
+      <div class="card-head">
+        <h2>😴 Sleep Log</h2>
+        <span class="muted small">Log last night's sleep — hours are calculated automatically.</span>
+      </div>
+      <form class="inline-add" id="sleepForm">
+        <div class="field">
+          <label>Date</label>
+          <input type="date" id="sleepDate" required />
+        </div>
+        <div class="field">
+          <label>Bedtime</label>
+          <input type="time" id="sleepBed" value="23:00" required />
+        </div>
+        <div class="field">
+          <label>Wake time</label>
+          <input type="time" id="sleepWake" value="07:00" required />
+        </div>
+        <div class="field grow">
+          <label>Sleep quality <span id="qualityVal" class="muted"></span></label>
+          <input type="range" id="sleepQuality" min="1" max="5" value="3" />
+        </div>
+        <button class="btn" type="submit">Save</button>
+      </form>
+
+      <div class="mt-lg" style="overflow-x:auto">
+        <table class="sleep-table" id="sleepTable">
+          <thead>
+            <tr><th>Date</th><th>Bedtime</th><th>Wake</th><th>Hours</th><th>Quality</th><th></th></tr>
+          </thead>
+          <tbody id="sleepBody"></tbody>
+        </table>
+        <div class="empty-hint hidden" id="sleepEmpty">No sleep logged yet.</div>
+      </div>
+    </section>
+
+    <footer class="foot">Everything is stored locally in your browser — no accounts, no servers.</footer>
+  </main>
+
+  <script src="assets/js/store.js"></script>
+  <script src="assets/js/track.js"></script>
+</body>
+</html>

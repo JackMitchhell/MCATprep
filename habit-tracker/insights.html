@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Insights — Habit & Sleep Tracker</title>
+  <meta name="description" content="Visualize time spent, task completion, and sleep patterns over time." />
+  <link rel="stylesheet" href="assets/css/style.css" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📈</text></svg>" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><span class="brand-mark">📈</span> Habit &amp; Sleep Tracker</div>
+    <nav class="nav">
+      <a href="index.html">Track</a>
+      <a href="insights.html" class="active">Insights</a>
+    </nav>
+    <div class="topbar-right">
+      <div class="range-tabs" id="rangeTabs">
+        <button data-days="7">7d</button>
+        <button data-days="14">14d</button>
+        <button data-days="30">30d</button>
+        <button data-days="90">90d</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="view">
+    <div class="grid cols-4" id="statTiles">
+      <div class="card stat-tile"><div class="num" id="statTotalTime">0h</div><div class="label">Time logged</div></div>
+      <div class="card stat-tile"><div class="num" id="statCompletion">0%</div><div class="label">Goals completed</div></div>
+      <div class="card stat-tile"><div class="num" id="statStreak">0</div><div class="label">Day streak</div></div>
+      <div class="card stat-tile"><div class="num" id="statAvgSleep">0h</div><div class="label">Avg sleep</div></div>
+    </div>
+
+    <div class="grid cols-2 mt-lg">
+      <section class="card">
+        <div class="card-head"><h2>Time Spent Per Day</h2></div>
+        <div class="chart-wrap"><div id="chartTime"></div></div>
+      </section>
+
+      <section class="card">
+        <div class="card-head"><h2>Goal Completion Rate</h2></div>
+        <div class="chart-wrap"><div id="chartCompletion"></div></div>
+      </section>
+    </div>
+
+    <section class="card mt-lg">
+      <div class="card-head"><h2>Top Goals by Time Spent</h2></div>
+      <div class="chart-wrap"><div id="chartTopTasks"></div></div>
+    </section>
+
+    <div class="section-title mt-lg" style="display:flex;align-items:center;gap:10px;">
+      <h2 style="margin:0">😴 Sleep</h2>
+    </div>
+    <div class="grid cols-2 mt-lg">
+      <section class="card">
+        <div class="card-head">
+          <h2>Hours Slept</h2>
+          <div class="row small muted">
+            Target
+            <input type="number" id="sleepTargetInput" min="1" max="14" step="0.5" style="width:60px" />
+            h
+          </div>
+        </div>
+        <div class="chart-wrap"><div id="chartSleepHours"></div></div>
+      </section>
+
+      <section class="card">
+        <div class="card-head"><h2>Sleep Consistency</h2></div>
+        <div class="chart-wrap"><div id="chartSleepTimes"></div></div>
+        <div class="chart-legend">
+          <span><span class="dot" style="background:var(--sleep)"></span>Bedtime</span>
+          <span><span class="dot" style="background:var(--accent)"></span>Wake time</span>
+        </div>
+      </section>
+    </div>
+
+    <div class="grid cols-3 mt-lg">
+      <div class="card stat-tile"><div class="num" id="statAvgBed">—</div><div class="label">Avg bedtime</div></div>
+      <div class="card stat-tile"><div class="num" id="statAvgWake">—</div><div class="label">Avg wake time</div></div>
+      <div class="card stat-tile"><div class="num" id="statConsistency">—</div><div class="label">Bedtime consistency (±min)</div></div>
+    </div>
+
+    <footer class="foot">Everything is stored locally in your browser — no accounts, no servers.</footer>
+  </main>
+
+  <script src="assets/js/store.js"></script>
+  <script src="assets/js/charts.js"></script>
+  <script src="assets/js/insights.js"></script>
+</body>
+</html>
